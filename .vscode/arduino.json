@@ -1,0 +1,6 @@
+{
+    "board": "arduino:avr:uno",
+    "sketch": "active\\active.ino",
+    "port": "COM17",
+    "programmer": "arduinoisp"
+}
