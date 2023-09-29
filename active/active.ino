@@ -1,206 +1,198 @@
-// Include necessary libraries
-#include <DFRobotDFPlayerMini.h>
 #include <SoftwareSerial.h>
-#include <avr/wdt.h>
+#include <DFRobotDFPlayerMini.h>
 
-// Configure SoftwareSerial for communication
-SoftwareSerial mySoftwareSerial(10, 11); // Define RX and TX pins
-DFRobotDFPlayerMini myDFPlayer;          // Create DFPlayer instance
+SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
+DFRobotDFPlayerMini myDFPlayer;
 
-// Define constants
-const int DEADBAND = 2;
-const int MAX_VOLUME = 20;
-const long DEBOUNCE_TIME = 50;
+const int switchPinLeft = 2;
+const int switchPinRight = 3;
 
-// Define a structure to encapsulate switch properties
-struct Switch
-{
-    int pin;                     // Switch's pin number
-    bool pressed;                // Flag to track switch's state
-    unsigned long lastPressTime; // Last time the switch was pressed
-};
-
-// Instances of the Switch structure for left and right switches
-Switch leftSwitch = {2, false, 0};
-Switch rightSwitch = {3, false, 0};
-
-// Define a structure to encapsulate potentiometer properties
-struct Potentiometer
-{
-    int pin;       // Potentiometer's pin number
-    int lastValue; // Last known value of the potentiometer
-};
-
-// Instances of the Potentiometer structure for left and right potentiometers
-Potentiometer leftPot = {A0, 0};
-Potentiometer rightPot = {A1, 0};
-
-// Variables to track the player state
-int lastPlayedSong = 01;
-int lastPlayedFolder = 01;
-bool isPlaying = true;
-bool trackEnded = false;
-
-// Setup function initializes configurations
 void setup()
 {
-    wdt_disable(); // Disable the watchdog timer during setup to prevent unintentional resets
-
-    Serial.begin(9600); // Start serial communication
-
-    // Set pin modes for switches and potentiometers
-    pinMode(leftPot.pin, INPUT);
-    pinMode(rightPot.pin, INPUT);
-    pinMode(leftSwitch.pin, INPUT_PULLUP);
-    pinMode(rightSwitch.pin, INPUT_PULLUP);
-
-    // Initialize communication with DFPlayer
-    mySoftwareSerial.begin(9600);
-    if (!myDFPlayer.begin(mySoftwareSerial)) // If initialization fails
-    {
-        Serial.println("DFPlayer not detected!"); // Notify via Serial
-        while (true)
-        {
-        } // Halt further execution
-    }
-
-    // Set initial volume and start playing the first track in the first folder
-    myDFPlayer.volume(10);
-    myDFPlayer.playFolder(1, 1);
-
-    // Enable the watchdog timer with a timeout of 8 seconds
-    wdt_enable(WDTO_8S);
+    Serial.begin(9600);
+    pinMode(switchPinLeft, INPUT_PULLUP);
+    pinMode(switchPinRight, INPUT_PULLUP);
 }
 
-// Main loop function
 void loop()
 {
-    wdt_reset(); // Reset the watchdog timer to avoid unintentional resets
+    bool leftSwitchState = digitalRead(switchPinLeft) == LOW;
+    bool rightSwitchState = digitalRead(switchPinRight) == LOW;
 
-    // Handle switch presses and potentiometer readings
-    handleSwitch(leftSwitch, isPlaying, leftPot);
-    handleSwitch(rightSwitch, isPlaying, rightPot);
+    Serial.print("Left Switch State: ");
+    Serial.println(leftSwitchState ? "Pressed" : "Not Pressed");
+    Serial.print("Right Switch State: ");
+    Serial.println(rightSwitchState ? "Pressed" : "Not Pressed");
 
-    // Play a random track when the current track finishes
-    if (myDFPlayer.readType() == DFPlayerPlayFinished && !trackEnded)
-    {
-        int randomTrack = random(1, myDFPlayer.readFileCountsInFolder(lastPlayedFolder) + 1);
-        myDFPlayer.playFolder(lastPlayedFolder, randomTrack);
-        trackEnded = true;
-    }
+    delay(500); // delay to make the output readable, adjust as necessary
 }
 
-// Function to handle switch presses and releases
-void handleSwitch(Switch &sw, bool &isPlayingFlag, Potentiometer &pot)
-{
-    if (digitalRead(sw.pin) == LOW) // If the switch is pressed
-    {
-        // Debounce the switch press
-        if (millis() - sw.lastPressTime > DEBOUNCE_TIME)
-        {
-            // Execute if this is the first time the switch is recognized as pressed
-            if (!sw.pressed)
-            {
-                Serial.println((sw.pin == leftSwitch.pin) ? "Left switch pressed. Volume Control ON" : "Right switch pressed. Changing Folder");
-                sw.pressed = true; // Mark the switch as pressed
+// // Working Code 9/16/2023
+// #include <DFRobotDFPlayerMini.h>
+// #include <SoftwareSerial.h>
 
-                // Handle actions specific to the left or right switch
-                if (sw.pin == leftSwitch.pin && !isPlayingFlag)
-                {
-                    // If playback was paused, resume it
-                    myDFPlayer.playFolder(lastPlayedFolder, lastPlayedSong);
-                    isPlayingFlag = true;
-                }
-                else if (sw.pin == rightSwitch.pin)
-                {
-                    // Change to the next folder, or wrap around to the first folder
-                    if (lastPlayedFolder < myDFPlayer.readFolderCounts())
-                    {
-                        lastPlayedFolder++;
-                    }
-                    else
-                    {
-                        lastPlayedFolder = 1;
-                    }
-                    myDFPlayer.playFolder(lastPlayedFolder, 1); // Play the first track of the selected folder
-                }
-            }
+// SoftwareSerial mySoftwareSerial(10, 11); // RX, TX
+// DFRobotDFPlayerMini myDFPlayer;
 
-            // Handle potentiometer readings based on which switch was pressed
-            int rawValue = analogRead(pot.pin);
-            if (sw.pin == leftSwitch.pin)
-            {
-                handleLeftPotentiometer(rawValue);
-            }
-            else
-            {
-                handleRightPotentiometer(rawValue);
-            }
+// const int potPinLeft = A0;
+// const int potPinRight = A1;
+// const int switchPinLeft = 2;
+// const int switchPinRight = 3;
 
-            sw.lastPressTime = millis(); // Update the last recognized press time
-        }
-    }
-    else // If the switch is not pressed
-    {
-        // Execute if this is the first time the switch is recognized as not pressed
-        if (sw.pressed)
-        {
-            Serial.println((sw.pin == leftSwitch.pin) ? "Left switch released. Volume Control OFF" : "Right switch released. Track selection OFF");
-            sw.pressed = false; // Mark the switch as not pressed
+// const int deadband = 2;
 
-            // Pause playback if the left switch was released
-            if (sw.pin == leftSwitch.pin)
-            {
-                myDFPlayer.pause();
-                isPlayingFlag = false;
-            }
-        }
-    }
-}
+// const int maxVolume = 30;
 
-// Function to handle volume control using the left potentiometer
-void handleLeftPotentiometer(int rawValue)
-{
-    Serial.print("Raw potentiometer value for volume: ");
-    Serial.println(rawValue);
+// int lastVolume = 0;
+// int lastPlayedSong = 01;
+// int lastPlayedFolder = 01;
+// bool rightSwitchPressed = false;
+// bool leftSwitchPressed = false;
+// bool isPlaying = true;
 
-    // Convert raw potentiometer value to a volume level
-    float volumeRatio = float(rawValue) / 1023.0;
-    int volume = int(pow(volumeRatio, 2) * MAX_VOLUME);
-    volume = constrain(volume, 0, MAX_VOLUME);
+// unsigned long lastSwitchPressTimeLeft = 0;
+// unsigned long lastSwitchPressTimeRight = 0;
+// const long debounceTime = 50;
 
-    // If the change in volume exceeds the deadband
-    if (abs(volume - leftPot.lastValue) > DEADBAND)
-    {
-        myDFPlayer.volume(volume);  // Adjust the volume
-        leftPot.lastValue = volume; // Update the last known volume
+// bool trackEnded = false;
 
-        Serial.print("Volume set to: ");
-        Serial.println(volume); // Notify the user via Serial
-    }
-}
+// void setup()
+// {
+//     Serial.begin(9600);
+//     pinMode(potPinLeft, INPUT);
+//     pinMode(potPinRight, INPUT);
+//     pinMode(switchPinLeft, INPUT_PULLUP);
+//     pinMode(switchPinRight, INPUT_PULLUP);
 
-// Function to handle track selection using the right potentiometer
-void handleRightPotentiometer(int rawValue)
-{
-    Serial.print("Raw potentiometer value for track: ");
-    Serial.println(rawValue);
+//     mySoftwareSerial.begin(9600);
+//     if (!myDFPlayer.begin(mySoftwareSerial))
+//     {
+//         Serial.println("DFPlayer not detected!");
+//         while (true)
+//             ;
+//     }
 
-    // // Convert raw potentiometer value to a track number within the range of tracks in the current folder
+//     myDFPlayer.volume(10);
+//     myDFPlayer.playFolder(1, 1);
+// }
 
-    int trackNumber = map(rawValue, 0, 1023, 1, 30);
+// void loop()
+// {
+//     handleLeftSwitch();
+//     handleRightSwitch();
 
-    if (abs(trackNumber - rightPot.lastValue) > DEADBAND)
-    {
-        myDFPlayer.playFolder(lastPlayedFolder, trackNumber); // Play the selected track
-        rightPot.lastValue = trackNumber;                     // Update the last known track number
-        trackEnded = false;
-    }
+//     if (myDFPlayer.readType() == DFPlayerPlayFinished && !trackEnded)
+//     {
+//         int randomTrack = random(1, myDFPlayer.readFileCountsInFolder(lastPlayedFolder) + 1);
+//         myDFPlayer.playFolder(lastPlayedFolder, randomTrack);
+//         trackEnded = true;
+//     }
+// }
 
-    // Play the first track of the first folder if the last track of the last folder has finished playing
-    if (myDFPlayer.readType() == DFPlayerPlayFinished && lastPlayedFolder >= myDFPlayer.readFileCountsInFolder(lastPlayedFolder))
-    {
-        lastPlayedFolder = 1;
-        myDFPlayer.playFolder(lastPlayedFolder, 1);
-    }
-}
+// void handleLeftSwitch()
+// {
+//     if (digitalRead(switchPinLeft) == LOW)
+//     {
+//         if (millis() - lastSwitchPressTimeLeft > debounceTime)
+//         {
+//             if (!leftSwitchPressed)
+//             {
+//                 Serial.println("Left switch pressed. Volume Control ON");
+//                 leftSwitchPressed = true;
+//                 if (!isPlaying)
+//                 {
+//                     myDFPlayer.playFolder(lastPlayedFolder, lastPlayedSong);
+//                     isPlaying = true;
+//                 }
+//             }
+
+//             int rawValue = analogRead(potPinLeft);
+//             // Serial.print("Raw potentiometer value for volume: ");
+//             // Serial.println(rawValue);
+
+//             float volumeRatio = float(rawValue) / 1023.0; // Convert rawValue to a ratio between 0 and 1
+//             int volume = int(volumeRatio * maxVolume);
+
+//             volume = constrain(volume, 0, maxVolume);
+
+//             if (abs(volume - lastVolume) > deadband)
+//             {
+//                 myDFPlayer.volume(volume);
+//                 lastVolume = volume;
+//                 Serial.print("Volume set to: ");
+//                 Serial.println(volume);
+//             }
+
+//             lastSwitchPressTimeLeft = millis();
+//         }
+//     }
+//     else
+//     {
+//         if (leftSwitchPressed)
+//         {
+//             Serial.println("Left switch released. Volume Control OFF");
+//             leftSwitchPressed = false;
+//             myDFPlayer.pause();
+//             isPlaying = false;
+//         }
+//     }
+// }
+
+// void handleRightSwitch()
+// {
+//     if (digitalRead(switchPinRight) == LOW)
+//     {
+//         if (millis() - lastSwitchPressTimeRight > debounceTime)
+//         {
+//             if (!rightSwitchPressed)
+//             {
+//                 Serial.println("Right switch pressed. Changing Folder");
+//                 rightSwitchPressed = true;
+
+//                 if (lastPlayedFolder < myDFPlayer.readFolderCounts())
+//                 {
+//                     lastPlayedFolder++;
+//                 }
+//                 else
+//                 {
+//                     lastPlayedFolder = 1; // Reset to the first folder
+//                 }
+//                 myDFPlayer.playFolder(lastPlayedFolder, 1);
+//             }
+
+//             int rawValue = analogRead(potPinRight);
+//             Serial.print("Raw potentiometer value for track: ");
+//             Serial.println(rawValue);
+
+//             int trackNumber = map(rawValue, 0, 1023, 1, 30);
+//             if (abs(trackNumber - lastPlayedSong) > deadband)
+//             {
+//                 myDFPlayer.playFolder(lastPlayedFolder, trackNumber);
+//                 lastPlayedSong = trackNumber;
+//                 trackEnded = false;
+
+//                 // Print Selected Folder and Track
+//                 Serial.print("Selected Folder: ");
+//                 Serial.println(lastPlayedFolder);
+//                 Serial.print("Selected Track: ");
+//                 Serial.println(lastPlayedSong);
+//             }
+
+//             if (myDFPlayer.readType() == DFPlayerPlayFinished && lastPlayedFolder >= myDFPlayer.readFileCountsInFolder(lastPlayedFolder))
+//             {
+//                 lastPlayedFolder = 1;
+//                 myDFPlayer.playFolder(lastPlayedFolder, 1);
+//             }
+
+//             lastSwitchPressTimeRight = millis();
+//         }
+//     }
+//     else
+//     {
+//         if (rightSwitchPressed)
+//         {
+//             Serial.println("Right switch released. Track selection OFF");
+//             rightSwitchPressed = false;
+//         }
+//     }
+// }
